@@ -176,48 +176,53 @@ public class UploadAction extends UploadServlet {
 
     perThreadRequest.set(request);
     try {
-      // Receive the files and form elements, updating the progress status
-      error = super.parsePostRequest(request, response);
-      if (error == null) {
-        // Fill files status before executing user code which could remove session files
-        getFileItemsSummary(request, tags);
-        // Call to the user code
-        message = executeAction(request, getMyLastReceivedFileItems(request));
+      try {
+        // Receive the files and form elements, updating the progress status
+        error = super.parsePostRequest(request, response);
+        if (error == null) {
+          // Fill files status before executing user code which could remove session files
+          getFileItemsSummary(request, tags);
+          // Call to the user code
+          message = executeAction(request, getMyLastReceivedFileItems(request));
+        }
+      } catch (UploadCanceledException e) {
+        renderXmlResponse(request, response, "<" + TAG_CANCELED + ">true</" + TAG_CANCELED + ">");
+        return;
+      } catch (UploadActionException e) {
+        logger.info("ExecuteUploadActionException when receiving a file.", e);
+        error =  e.getMessage();
+      } catch (Exception e) {
+        logger.info("Unknown Exception when receiving a file.", e);
+        error = e.getMessage();
       }
-    } catch (UploadCanceledException e) {
-      renderXmlResponse(request, response, "<" + TAG_CANCELED + ">true</" + TAG_CANCELED + ">");
-      return;
-    } catch (UploadActionException e) {
-      logger.info("ExecuteUploadActionException when receiving a file.", e);
-      error =  e.getMessage();
-    } catch (Exception e) {
-      logger.info("Unknown Exception when receiving a file.", e);
-      error = e.getMessage();
+      
+      String postResponse = null;
+      AbstractUploadListener listener = getCurrentListener(request);
+      if (error != null) {
+        postResponse = "<" + TAG_ERROR + ">" + error + "</" + TAG_ERROR + ">";
+        renderXmlResponse(request, response, postResponse);
+        if (listener != null) {
+          listener.setException(new RuntimeException(error));
+        }
+        UploadServlet.removeSessionFileItems(request);
+      } else {
+        if (message != null) {
+          // see issue #139
+          tags.put("message", "<![CDATA[" + message + "]]>");
+        }
+        postResponse = statusToString(tags);
+        renderXmlResponse(request, response, postResponse, true);
+      }
+      finish(request, postResponse);
+      if(listener != null && listener.isFinished()) {
+    	  removeCurrentListener(request);
+      }
+
+      if (removeSessionFiles) {
+        removeSessionFileItems(request, removeData);
+      }
     } finally {
       perThreadRequest.set(null);
-    }
-
-    String postResponse = null;
-    AbstractUploadListener listener = getCurrentListener(request);
-    if (error != null) {
-      postResponse = "<" + TAG_ERROR + ">" + error + "</" + TAG_ERROR + ">";
-      renderXmlResponse(request, response, postResponse);
-      if (listener != null) {
-        listener.setException(new RuntimeException(error));
-      }
-      UploadServlet.removeSessionFileItems(request);
-    } else {
-      if (message != null) {
-        // see issue #139
-        tags.put("message", "<![CDATA[" + message + "]]>");
-      }
-      postResponse = statusToString(tags);
-      renderXmlResponse(request, response, postResponse, true);
-    }
-    finish(request, postResponse);
-
-    if (removeSessionFiles) {
-      removeSessionFileItems(request, removeData);
     }
   }
 }
