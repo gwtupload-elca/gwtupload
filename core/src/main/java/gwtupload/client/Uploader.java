@@ -16,50 +16,6 @@
  */
 package gwtupload.client;
 
-import com.google.gwt.core.client.GWT;
-import com.google.gwt.core.client.JavaScriptObject;
-import com.google.gwt.core.client.JsArray;
-import com.google.gwt.dom.client.AnchorElement;
-import com.google.gwt.dom.client.FormElement;
-import com.google.gwt.event.dom.client.ChangeEvent;
-import com.google.gwt.event.dom.client.ChangeHandler;
-import com.google.gwt.event.shared.HandlerRegistration;
-import com.google.gwt.http.client.Request;
-import com.google.gwt.http.client.RequestCallback;
-import com.google.gwt.http.client.RequestException;
-import com.google.gwt.http.client.RequestTimeoutException;
-import com.google.gwt.http.client.Response;
-import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.Window;
-import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.FlowPanel;
-import com.google.gwt.user.client.ui.FormPanel;
-import com.google.gwt.user.client.ui.FormPanel.SubmitCompleteEvent;
-import com.google.gwt.user.client.ui.FormPanel.SubmitCompleteHandler;
-import com.google.gwt.user.client.ui.FormPanel.SubmitEvent;
-import com.google.gwt.user.client.ui.FormPanel.SubmitHandler;
-import com.google.gwt.user.client.ui.HTML;
-import com.google.gwt.user.client.ui.Hidden;
-import com.google.gwt.user.client.ui.HorizontalPanel;
-import com.google.gwt.user.client.ui.Panel;
-import com.google.gwt.user.client.ui.RootPanel;
-import com.google.gwt.user.client.ui.Widget;
-import com.google.gwt.xml.client.Document;
-import com.google.gwt.xml.client.Node;
-import com.google.gwt.xml.client.NodeList;
-import com.google.gwt.xml.client.XMLParser;
-import com.google.gwt.xml.client.impl.DOMParseException;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.logging.Logger;
-
-import gwtupload.client.dnd.DragAndDropFormPanel;
-import gwtupload.client.dnd.IDragAndDropFileInput;
 import static gwtupload.shared.UConsts.ATTR_BLOBSTORE_PARAM_NAME;
 import static gwtupload.shared.UConsts.MULTI_SUFFIX;
 import static gwtupload.shared.UConsts.PARAM_BLOBKEY;
@@ -94,6 +50,49 @@ import gwtupload.client.IFileInput.FileInputType;
 import gwtupload.client.ISession.Session;
 import gwtupload.client.IUploadStatus.Status;
 import gwtupload.client.bundle.UploadCss;
+import gwtupload.client.dnd.DragAndDropFormPanel;
+import gwtupload.client.dnd.IDragAndDropFileInput;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.logging.Logger;
+
+import com.google.gwt.core.client.GWT;
+import com.google.gwt.core.client.JavaScriptObject;
+import com.google.gwt.core.client.JsArray;
+import com.google.gwt.dom.client.FormElement;
+import com.google.gwt.event.dom.client.ChangeEvent;
+import com.google.gwt.event.dom.client.ChangeHandler;
+import com.google.gwt.event.shared.HandlerRegistration;
+import com.google.gwt.http.client.Request;
+import com.google.gwt.http.client.RequestCallback;
+import com.google.gwt.http.client.RequestException;
+import com.google.gwt.http.client.RequestTimeoutException;
+import com.google.gwt.http.client.Response;
+import com.google.gwt.user.client.Element;
+import com.google.gwt.user.client.Timer;
+import com.google.gwt.user.client.Window;
+import com.google.gwt.user.client.ui.Composite;
+import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.FormPanel;
+import com.google.gwt.user.client.ui.FormPanel.SubmitCompleteEvent;
+import com.google.gwt.user.client.ui.FormPanel.SubmitCompleteHandler;
+import com.google.gwt.user.client.ui.FormPanel.SubmitEvent;
+import com.google.gwt.user.client.ui.FormPanel.SubmitHandler;
+import com.google.gwt.user.client.ui.HTML;
+import com.google.gwt.user.client.ui.Hidden;
+import com.google.gwt.user.client.ui.HorizontalPanel;
+import com.google.gwt.user.client.ui.Panel;
+import com.google.gwt.user.client.ui.RootPanel;
+import com.google.gwt.user.client.ui.Widget;
+import com.google.gwt.xml.client.Document;
+import com.google.gwt.xml.client.Node;
+import com.google.gwt.xml.client.NodeList;
+import com.google.gwt.xml.client.XMLParser;
 
 /**
  * <p>
@@ -431,11 +430,6 @@ public class Uploader extends Composite implements IsUpdateable, IUploader, HasJ
 
   private SubmitCompleteHandler onSubmitCompleteHandler = new SubmitCompleteHandler() {
     public void onSubmitComplete(SubmitCompleteEvent event) {
-      if (event.getResults() == null || event.getResults().isEmpty()) {
-          // https://github.com/manolo/gwtupload/issues/11
-          log("Ignoring empty message in onSubmitComplete", null);
-          return;
-      }
       updateStatusTimer.cancel();
       onSubmitComplete = true;
       serverRawResponse = event.getResults();
@@ -1319,21 +1313,15 @@ public class Uploader extends Composite implements IsUpdateable, IUploader, HasJ
       statusWidget.setStatus(IUploadStatus.Status.ERROR);
     }
     onFinishUpload();
-    //reatachIframe(uploadForm.getElement().getAttribute("target"));
+    reatachIframe(uploadForm.getElement());
   }
 
-  // Fix for issue http://stackoverflow.com/questions/27711821
-  private native static void reatachIframe(String name) /*-{
-    if ($doc.querySelector) {
-      var i = $doc.querySelector('iframe[name="' + name + '"]');
-      if (i) {
-        var o = i.onload;
-        i.onload = undefined;
-        var p = i.parentElement;
-        p.removeChild(i);
-        p.appendChild(i);
-        i.onload = o;
-      }
+  private native static void reatachIframe(Element e) /*-{
+    var t = e.getAttribute('target');
+    if (t) {
+      var i = $doc.querySelector('iframe[name="' + t + '"]');
+      if (i)
+        i.action='javascript:void';
     }
   }-*/;
 
