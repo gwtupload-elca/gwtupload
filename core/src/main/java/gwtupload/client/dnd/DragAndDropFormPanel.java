@@ -22,6 +22,8 @@ import gwtupload.client.IFileInput;
  * @author Manolo Carrasco Moñino
  */
 public class DragAndDropFormPanel extends FormPanel {
+	
+  private HandlerRegistration previousNonDndSubmitCompleteHandler = null;
 
   @Override
   public void setAction(String url) {
@@ -75,15 +77,21 @@ public class DragAndDropFormPanel extends FormPanel {
 
   @Override
   public void submit() {
+    if(previousNonDndSubmitCompleteHandler != null) {
+      previousNonDndSubmitCompleteHandler.removeHandler();
+      previousNonDndSubmitCompleteHandler = null;
+    }
     final List<IFileInput> childFileInputs = getChildFileInputs();
     if (childFileInputs == null || childFileInputs.isEmpty()) {
       return;
     }
     final ArrayList<IDragAndDropFileInput> dndFileInputs = new ArrayList<IDragAndDropFileInput>();
+    final ArrayList<IDragAndDropFileInput> allDndFileInputs = new ArrayList<IDragAndDropFileInput>();
     boolean thereAreNonDragAndDropFileInputs = false;
     for (IFileInput fileInput : childFileInputs) {
       if (fileInput instanceof IDragAndDropFileInput) {
         final IDragAndDropFileInput dndFileInput = (IDragAndDropFileInput) fileInput;
+        allDndFileInputs.add(dndFileInput);
         if (dndFileInput.hasFiles()) {
           dndFileInputs.add(dndFileInput);
         } else {
@@ -96,6 +104,19 @@ public class DragAndDropFormPanel extends FormPanel {
       }
     }
     if (thereAreNonDragAndDropFileInputs) {
+      for(IDragAndDropFileInput dndFileInput: allDndFileInputs) {
+        dndFileInput.lock();
+      }
+      previousNonDndSubmitCompleteHandler = super.addSubmitCompleteHandler(new FormPanel.SubmitCompleteHandler() {
+	    @Override
+        public void onSubmitComplete(SubmitCompleteEvent event) {
+	      for(IDragAndDropFileInput dndFileInput: allDndFileInputs) {
+	        dndFileInput.reset();
+	      }
+	      previousNonDndSubmitCompleteHandler.removeHandler();
+	      previousNonDndSubmitCompleteHandler = null;
+		}
+      });
       super.submit(); // submit non-dnd file inputs
     }
     if (!dndFileInputs.isEmpty()) {
