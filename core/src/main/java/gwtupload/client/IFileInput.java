@@ -124,6 +124,11 @@ public interface IFileInput extends HasChangeHandlers, IsWidget {
         super.setText(text);
       }
     }
+    
+    public void setVisibleButton(boolean enabled) {
+    	this.button.setVisible(enabled);
+    	
+    }
   }
 
   /**
